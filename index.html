@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ランダム・ストリートビュー</title>
+<style>
+  :root {
+    --bg: #F4F5F6;
+    --surface: #FFFFFF;
+    --text: #1D2125;
+    --muted: #5B636B;
+    --line: #D5D9DD;
+    --accent: #F2C230;      /* 道路の黄色ライン */
+    --accent-text: #1D2125;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1E2226;
+      --surface: #2A2F34;
+      --text: #ECEEF0;
+      --muted: #A3ABB3;
+      --line: #3B4248;
+      --accent: #F2C230;
+      --accent-text: #1D2125;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .view {
+    flex: 1;
+    position: relative;
+    min-height: 0;
+  }
+  .view iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+  .notice {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+    line-height: 1.8;
+    color: var(--muted);
+  }
+  .notice code {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--text);
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 20px;
+    background: var(--surface);
+    border-top: 4px solid var(--accent);
+  }
+  .place { flex: 1; min-width: 0; }
+  .place h1 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .place p {
+    margin: 2px 0 0;
+    font-size: 0.875rem;
+    color: var(--muted);
+  }
+  button {
+    font: inherit;
+    font-weight: 700;
+    padding: 10px 20px;
+    border: 0;
+    border-radius: 6px;
+    background: var(--accent);
+    color: var(--accent-text);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  button:hover { filter: brightness(0.95); }
+  button:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
+  .maps-link {
+    font-size: 0.875rem;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  @media (max-width: 560px) {
+    .bar { flex-wrap: wrap; }
+    .place { flex-basis: 100%; }
+    button { flex: 1; }
+  }
+</style>
+</head>
+<body>
+
+<main class="view">
+  <iframe id="sv" title="ストリートビュー" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>
+  <div class="notice" id="notice">
+    <div>
+      APIキーが設定されていません。<br>
+      HTML内の <code>API_KEY</code> に、Google Cloudで発行したキーを入れてください。
+    </div>
+  </div>
+</main>
+
+<footer class="bar">
+  <div class="place">
+    <h1 id="title">読み込み中</h1>
+    <p id="country"></p>
+  </div>
+  <a class="maps-link" id="mapsLink" href="#" target="_blank" rel="noopener">Googleマップで開く</a>
+  <button id="next" type="button">別の場所を見る</button>
+</footer>
+
+<script>
+  // ここにGoogle Cloudで発行したAPIキーを入れる（Maps Embed APIを有効化しておくこと）
+  const API_KEY = "YOUR_API_KEY";
+
+  // 場所の一覧
+  // lat/lng: 緯度・経度、heading: カメラの向き（0=北, 90=東）、pitch: 上下の角度、fov: 視野角（10〜100）
+  const PLACES = [
+    { title: "渋谷スクランブル交差点", country: "日本・東京", lat: 35.6595, lng: 139.7005, heading: 200, pitch: 5, fov: 90 },
+    { title: "伏見稲荷大社", country: "日本・京都", lat: 34.9671, lng: 135.7727, heading: 90, pitch: 0, fov: 90 },
+    { title: "タイムズスクエア", country: "アメリカ・ニューヨーク", lat: 40.7580, lng: -73.9855, heading: 20, pitch: 10, fov: 90 },
+    { title: "ゴールデンゲートブリッジ", country: "アメリカ・サンフランシスコ", lat: 37.8078, lng: -122.4750, heading: 0, pitch: 5, fov: 90 },
+    { title: "グランドキャニオン（マザーポイント）", country: "アメリカ・アリゾナ", lat: 36.0617, lng: -112.1077, heading: 0, pitch: -5, fov: 90 },
+    { title: "トロカデロ広場から見たエッフェル塔", country: "フランス・パリ", lat: 48.8620, lng: 2.2880, heading: 140, pitch: 15, fov: 80 },
+    { title: "コロッセオ", country: "イタリア・ローマ", lat: 41.8919, lng: 12.4884, heading: 130, pitch: 5, fov: 90 },
+    { title: "リアルト橋", country: "イタリア・ヴェネツィア", lat: 45.4380, lng: 12.3358, heading: 0, pitch: 0, fov: 90 },
+    { title: "タワーブリッジ", country: "イギリス・ロンドン", lat: 51.5055, lng: -0.0754, heading: 90, pitch: 5, fov: 90 },
+    { title: "シドニー・オペラハウス", country: "オーストラリア・シドニー", lat: -33.8568, lng: 151.2153, heading: 30, pitch: 5, fov: 90 }
+  ];
+
+  const iframe = document.getElementById("sv");
+  const titleEl = document.getElementById("title");
+  const countryEl = document.getElementById("country");
+  const mapsLink = document.getElementById("mapsLink");
+  const notice = document.getElementById("notice");
+
+  // 同じ場所が続かないよう、一覧をシャッフルして順番に出す
+  let deck = [];
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+  function nextPlace() {
+    if (deck.length === 0) deck = shuffle(PLACES);
+    return deck.pop();
+  }
+
+  function show(place) {
+    titleEl.textContent = place.title;
+    countryEl.textContent = place.country;
+
+    const params = new URLSearchParams({
+      key: API_KEY,
+      location: place.lat + "," + place.lng,
+      heading: String(place.heading),
+      pitch: String(place.pitch),
+      fov: String(place.fov)
+    });
+    iframe.src = "https://www.google.com/maps/embed/v1/streetview?" + params.toString();
+
+    mapsLink.href = "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint="
+      + place.lat + "," + place.lng + "&heading=" + place.heading + "&pitch=" + place.pitch;
+  }
+
+  if (!API_KEY || API_KEY === "YOUR_API_KEY") {
+    notice.style.display = "flex";
+    titleEl.textContent = "APIキー未設定";
+  } else {
+    show(nextPlace());
+  }
+
+  document.getElementById("next").addEventListener("click", () => {
+    if (API_KEY && API_KEY !== "YOUR_API_KEY") show(nextPlace());
+  });
+</script>
+</body>
+</html>
