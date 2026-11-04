@@ -11,7 +11,7 @@
     --text: #1D2125;
     --muted: #5B636B;
     --line: #D5D9DD;
-    --accent: #F2C230;      /* 道路の黄色ライン */
+    --accent: #F2C230;
     --accent-text: #1D2125;
     color-scheme: light;
   }
@@ -37,77 +37,45 @@
     flex-direction: column;
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
-  .view {
-    flex: 1;
-    position: relative;
-    min-height: 0;
-  }
-  .view iframe {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    border: 0;
-  }
+  .view { flex: 1; position: relative; min-height: 0; }
+  .view iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
   .notice {
-    position: absolute;
-    inset: 0;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    text-align: center;
-    line-height: 1.8;
-    color: var(--muted);
+    position: absolute; inset: 0; display: none;
+    align-items: center; justify-content: center;
+    padding: 24px; text-align: center; line-height: 1.8; color: var(--muted);
   }
   .notice code {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    padding: 2px 6px;
-    border-radius: 4px;
-    color: var(--text);
+    background: var(--surface); border: 1px solid var(--line);
+    padding: 2px 6px; border-radius: 4px; color: var(--text);
   }
   .bar {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 14px 20px;
+    display: flex; align-items: center; gap: 16px;
+    padding: 14px 20px 10px;
     background: var(--surface);
     border-top: 4px solid var(--accent);
   }
   .place { flex: 1; min-width: 0; }
   .place h1 {
-    margin: 0;
-    font-size: 1.25rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    margin: 0; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.02em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .place p {
-    margin: 2px 0 0;
-    font-size: 0.875rem;
-    color: var(--muted);
-  }
+  .place p { margin: 2px 0 0; font-size: 0.875rem; color: var(--muted); }
+  .maps-link { font-size: 0.875rem; color: var(--muted); white-space: nowrap; }
   button {
-    font: inherit;
-    font-weight: 700;
-    padding: 10px 20px;
-    border: 0;
-    border-radius: 6px;
-    background: var(--accent);
-    color: var(--accent-text);
-    cursor: pointer;
-    white-space: nowrap;
+    font: inherit; font-weight: 700;
+    padding: 10px 20px; border: 0; border-radius: 6px;
+    background: var(--accent); color: var(--accent-text);
+    cursor: pointer; white-space: nowrap;
   }
   button:hover { filter: brightness(0.95); }
-  button:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
-  .maps-link {
-    font-size: 0.875rem;
-    color: var(--muted);
-    white-space: nowrap;
+  button:disabled { opacity: 0.5; cursor: default; }
+  button:focus-visible, a:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
+  .credit {
+    margin: 0; padding: 0 20px 10px;
+    background: var(--surface);
+    font-size: 0.75rem; color: var(--muted);
   }
+  .credit a { color: var(--muted); }
   @media (max-width: 560px) {
     .bar { flex-wrap: wrap; }
     .place { flex-basis: 100%; }
@@ -118,91 +86,121 @@
 <body>
 
 <main class="view">
-  <iframe id="sv" title="ストリートビュー" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>
-  <div class="notice" id="notice">
-    <div>
-      APIキーが設定されていません。<br>
-      HTML内の <code>API_KEY</code> に、Google Cloudで発行したキーを入れてください。
-    </div>
-  </div>
+  <iframe id="sv" title="ストリートビュー" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>
+  <div class="notice" id="notice"><div id="noticeText"></div></div>
 </main>
 
-<footer class="bar">
-  <div class="place">
-    <h1 id="title">読み込み中</h1>
-    <p id="country"></p>
+<footer>
+  <div class="bar">
+    <div class="place">
+      <h1 id="title">読み込み中</h1>
+      <p id="detail"></p>
+    </div>
+    <a class="maps-link" id="mapsLink" href="#" target="_blank" rel="noopener">Googleマップで開く</a>
+    <button id="next" type="button" disabled>別の場所を見る</button>
   </div>
-  <a class="maps-link" id="mapsLink" href="#" target="_blank" rel="noopener">Googleマップで開く</a>
-  <button id="next" type="button">別の場所を見る</button>
+  <p class="credit">地名データ: <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a>（<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>）</p>
 </footer>
 
 <script>
   // ここにGoogle Cloudで発行したAPIキーを入れる（Maps Embed APIを有効化しておくこと）
   const API_KEY = "AIzaSyDKNWKl2FwvBcHL8EL2hrGT0wGbh-Xpwwk";
 
-  // 場所の一覧
-  // lat/lng: 緯度・経度、heading: カメラの向き（0=北, 90=東）、pitch: 上下の角度、fov: 視野角（10〜100）
-  const PLACES = [
-    { title: "渋谷スクランブル交差点", country: "日本・東京", lat: 35.6595, lng: 139.7005, heading: 200, pitch: 5, fov: 90 },
-    { title: "伏見稲荷大社", country: "日本・京都", lat: 34.9671, lng: 135.7727, heading: 90, pitch: 0, fov: 90 },
-    { title: "タイムズスクエア", country: "アメリカ・ニューヨーク", lat: 40.7580, lng: -73.9855, heading: 20, pitch: 10, fov: 90 },
-    { title: "ゴールデンゲートブリッジ", country: "アメリカ・サンフランシスコ", lat: 37.8078, lng: -122.4750, heading: 0, pitch: 5, fov: 90 },
-    { title: "グランドキャニオン（マザーポイント）", country: "アメリカ・アリゾナ", lat: 36.0617, lng: -112.1077, heading: 0, pitch: -5, fov: 90 },
-    { title: "トロカデロ広場から見たエッフェル塔", country: "フランス・パリ", lat: 48.8620, lng: 2.2880, heading: 140, pitch: 15, fov: 80 },
-    { title: "コロッセオ", country: "イタリア・ローマ", lat: 41.8919, lng: 12.4884, heading: 130, pitch: 5, fov: 90 },
-    { title: "リアルト橋", country: "イタリア・ヴェネツィア", lat: 45.4380, lng: 12.3358, heading: 0, pitch: 0, fov: 90 },
-    { title: "タワーブリッジ", country: "イギリス・ロンドン", lat: 51.5055, lng: -0.0754, heading: 90, pitch: 5, fov: 90 },
-    { title: "シドニー・オペラハウス", country: "オーストラリア・シドニー", lat: -33.8568, lng: 151.2153, heading: 30, pitch: 5, fov: 90 }
-  ];
+  // 都市の中心から、この距離（メートル）以内でランダムに座標をずらす
+  const MAX_OFFSET_M = 1000;
+
+  // 都市データ（index.html と同じ場所に置く）
+  const DATA_URL = "cities.json";
 
   const iframe = document.getElementById("sv");
   const titleEl = document.getElementById("title");
-  const countryEl = document.getElementById("country");
+  const detailEl = document.getElementById("detail");
   const mapsLink = document.getElementById("mapsLink");
+  const nextBtn = document.getElementById("next");
   const notice = document.getElementById("notice");
+  const noticeText = document.getElementById("noticeText");
 
-  // 同じ場所が続かないよう、一覧をシャッフルして順番に出す
-  let deck = [];
-  function shuffle(arr) {
-    const a = arr.slice();
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-  }
-  function nextPlace() {
-    if (deck.length === 0) deck = shuffle(PLACES);
-    return deck.pop();
+  // 全大陸の国を1列に並べた一覧
+  // 国を均等に選ぶ = 大陸を「国の数に比例した確率」で選ぶのと同じになる
+  let COUNTRIES = [];
+
+  function showNotice(html) {
+    noticeText.innerHTML = html;
+    notice.style.display = "flex";
   }
 
-  function show(place) {
-    titleEl.textContent = place.title;
-    countryEl.textContent = place.country;
+  function pick(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
 
+  // 都市の中心から、円の中に均等に散らばるようにランダムな座標を作る
+  function randomPointNear(lat, lng, maxMeters) {
+    const r = maxMeters * Math.sqrt(Math.random());   // 中心に偏らないよう平方根をとる
+    const theta = Math.random() * 2 * Math.PI;
+    const dLat = (r * Math.cos(theta)) / 111320;      // 緯度1度 ≒ 111.32km
+    const dLng = (r * Math.sin(theta)) / (111320 * Math.cos(lat * Math.PI / 180));
+    return { lat: lat + dLat, lng: lng + dLng };
+  }
+
+  function showRandom() {
+    // 1. 国を均等に選ぶ
+    const country = pick(COUNTRIES);
+    // 2. その国の都市を均等に選ぶ  [都市名, 緯度, 経度]
+    const [cityName, cLat, cLng] = pick(country.cities);
+    // 3. 都市の中心からランダムにずらす
+    const p = randomPointNear(cLat, cLng, MAX_OFFSET_M);
+    const heading = Math.floor(Math.random() * 360);
+
+    titleEl.textContent = cityName + " 付近";
+    detailEl.textContent = country.name + "・" + country.continentName;
+
+    const loc = p.lat.toFixed(6) + "," + p.lng.toFixed(6);
     const params = new URLSearchParams({
       key: API_KEY,
-      location: place.lat + "," + place.lng,
-      heading: String(place.heading),
-      pitch: String(place.pitch),
-      fov: String(place.fov)
+      location: loc,
+      heading: String(heading),
+      pitch: "0",
+      fov: "90"
     });
     iframe.src = "https://www.google.com/maps/embed/v1/streetview?" + params.toString();
 
     mapsLink.href = "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint="
-      + place.lat + "," + place.lng + "&heading=" + place.heading + "&pitch=" + place.pitch;
+      + loc + "&heading=" + heading;
   }
 
-  if (!API_KEY || API_KEY === "YOUR_API_KEY") {
-    notice.style.display = "flex";
-    titleEl.textContent = "APIキー未設定";
-  } else {
-    show(nextPlace());
+  async function init() {
+    if (!API_KEY || API_KEY === "YOUR_API_KEY") {
+      titleEl.textContent = "APIキー未設定";
+      showNotice("APIキーが設定されていません。<br>HTML内の <code>API_KEY</code> に、Google Cloudで発行したキーを入れてください。");
+      return;
+    }
+
+    try {
+      const res = await fetch(DATA_URL);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+
+      // 大陸 → 国 の階層を、国の一覧に展開する
+      for (const continent of Object.values(data.continents)) {
+        for (const c of Object.values(continent.countries)) {
+          if (c.cities.length > 0) {
+            COUNTRIES.push({ name: c.name, continentName: continent.name, cities: c.cities });
+          }
+        }
+      }
+      if (COUNTRIES.length === 0) throw new Error("都市データが空です");
+    } catch (e) {
+      titleEl.textContent = "都市データを読み込めません";
+      showNotice("<code>cities.json</code> を読み込めませんでした。<br>index.html と同じ場所に置かれているか確認してください。");
+      return;
+    }
+
+    nextBtn.disabled = false;
+    showRandom();
   }
 
-  document.getElementById("next").addEventListener("click", () => {
-    if (API_KEY && API_KEY !== "YOUR_API_KEY") show(nextPlace());
-  });
+  nextBtn.addEventListener("click", showRandom);
+  init();
 </script>
 </body>
 </html>
